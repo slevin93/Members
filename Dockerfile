@@ -1,19 +1,22 @@
-# https://hub.docker.com/_/microsoft-dotnet
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
-WORKDIR /source
+#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-# copy csproj and restore as distinct layers
-COPY *.sln .
-COPY MembersExample/*.csproj ./MembersExample/
-RUN dotnet restore
-
-# copy everything else and build app
-COPY MembersExample/. ./MembersExample/
-WORKDIR /source/MembersExample
-RUN dotnet publish -c release -o /app --no-restore
-
-# final stage/image
-FROM mcr.microsoft.com/dotnet/aspnet:6.0
+FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
 WORKDIR /app
-COPY --from=build /app ./
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+WORKDIR /src
+COPY ["MembersExample/MembersExample.csproj", "MembersExample/"]
+RUN dotnet restore "MembersExample/MembersExample.csproj"
+COPY . .
+WORKDIR "/src/MembersExample"
+RUN dotnet build "MembersExample.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "MembersExample.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "MembersExample.dll"]
